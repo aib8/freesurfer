@@ -38,12 +38,28 @@ const char *Progname ;
 
 /***-------------------------------------------------------****/
 int main(int argc, char *argv[]) {
-//TODO
+    MRI *mri_1, *mri_2, *mri_out;
+
+    // fill both MRI variables, input check
+    mri_1 = MRIread(argv[1]);
+    if (!mri_1)
+        ErrorExit(ERROR_BADPARM, "%s: could not read source volume %s",
+                  Progname, argv[1]);
+    mri_2 = MRIread(argv[2]);
+    if (!mri_2)
+        ErrorExit(ERROR_BADPARM, "%s: could not read source volume %s",
+                  Progname, argv[2]);
+
+    // input check for whether the two given volumes are of equal dimensions
+    if !(mri_1.width == mri_2.width && mri_1.height == mri_2.hieght && mri_1.depth == mri_2.depth)
+        ErrorExit(ERROR_BADPARM, "Given MRI volumes must have the same dimensions");
+
+    // perform the subtract, pixelwise (nested for loops)
 
 
-
-
-
+    // save the results to mri output variable
+    mri_out =
+    MRIwrite(mri_out, argv[3]);
 }
 
 
