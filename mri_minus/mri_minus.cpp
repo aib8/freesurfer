@@ -24,6 +24,7 @@
 #include "mri.h"
 #include "version.h"
 #include "macros.h"
+#include "string"
 
 static void print_usage(void) ;
 static void usage_exit(void);
@@ -32,6 +33,7 @@ static void print_version(void) ;
 
 static int get_option(int argc, char *argv[]) ;
 static char vcid[] = "";
+static string operation = "minus"
 
 const char *Progname ;
 
@@ -50,21 +52,56 @@ int main(int argc, char *argv[]) {
         ErrorExit(ERROR_BADPARM, "%s: could not read source volume %s",
                   Progname, argv[2]);
 
+    // define the MRI output based off given MRI
+    mri_out = MRIclone(mri_1, NULL)
+
     // input check for whether the two given volumes are of equal dimensions
-    if !(mri_1.width == mri_2.width && mri_1.height == mri_2.hieght && mri_1.depth == mri_2.depth)
-        ErrorExit(ERROR_BADPARM, "Given MRI volumes must have the same dimensions");
+    if !(mri_1->xsize == mri_2->xsize && mri_1->ysize == mri_2->ysize && mri_1->zsize == mri_2->zsize)
+        ErrorExit(ERROR_BADPARM, "Given MRI volumes must have the same dimensions, number of frames");
 
-    // perform the subtract, pixelwise (nested for loops)
+    // compare voxel sixes as well
+    if !(mri_1->width == mri_2->width && mri_1->height == mri_2->hieght && mri_1->depth == mri_2->depth)
+         ErrorExit(ERROR_BADPARM, "Given MRI volumes must have identical voxel volume sizes");
 
+    // perform the subtract (or addition), pixelwise (nested for loops), only for first frame
+    int x, y, z;
+    for (int x = 0; x < mri_1->width; x++) {
+        for (int y = 0; y < mri_1->height; y++) {
+            for (int z = 0; z < mri_1->depth; z++) {
+                if (operation == "minus") {
+                    MRIsetVoxVal(mri_out , 0, MRIgetVoxVal(mri_1, x, y, z, 0) - MRIgetVoxVal(mri_2, x, y, z, 0))
+                } else {
+                    MRIsetVoxVal(mri_out , 0, MRIgetVoxVal(mri_1, x, y, z, 0) + MRIgetVoxVal(mri_2, x, y, z, 0))\
+                }
+            }
+        }
+    }
 
     // save the results to mri output variable
-    mri_out =
     MRIwrite(mri_out, argv[3]);
 }
 
 
 static int get_option(int argc, char *argv[]) {
-//TODO
+    option = argv[1] + 1 ;            /* past '-' */
+    if (!stricmp(option, "-help")||!stricmp(option, "-usage"))
+    {
+        print_usage();
+    }
+    else if (!stricmp(option, "version"))
+    {
+        print_version();
+    }
+    else if (!stricmp(option, "plus"))
+    {
+        operation = "plus";
+    }
+    else
+    {
+        fprintf(stderr, "unknown option %s\n", argv[1]) ;
+        usage(1) ;
+        exit(1) ;
+    }
 }
 
 /* --------------------------------------------- */
