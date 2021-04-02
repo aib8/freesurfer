@@ -95,7 +95,7 @@ static char vcid[] = "$Id: mris_smooth_intracortical.c,v 1.30 2019/02/21 18:48:2
 const char *Progname = NULL;
 
 char surf_path[STRLEN], over_path[STRLEN], out_path[STRLEN], surf_name[STRLEN], over_name[STRLEN], surf_dir[STRLEN], over_dir[STRLEN], out_dir[STRLEN], out_name[STRLEN];
-int surf_num = 0, over_num = 0, nb_rad = 0, ic_size = 1, ic_start = 0, nb_wf = 0; //nb_wf = 0 (gauss)
+int surf_num = 0, over_num = 0, nb_rad = 0, ic_size = 1, ic_start = 0, tan_nb_wf = 0; rad_nb_wf = 0; //nb_wf = 0 (gauss)
 
 int main(int argc, char *argv[]) {
 	Progname = argv[0];
@@ -163,45 +163,53 @@ int main(int argc, char *argv[]) {
 		static int nb_num;
 
 		// initializing the output with 0s
-		for (f = 0; f < ic_size; f++) output[f] = MRIclone(over[f], NULL);
-		float val, count;
-		// for each surface & each vertex
-		for (f = 0; f < ic_size; f++) {
-			for (v = 0; v < surf[f]->nvertices; v++) {
-				// neighborhood
-				nb_num = MRISfindNeighborsAtVertex(surf[f], v, nb_rad, MAX_NEIGHBORS, neighbors, hops);
-				//TODO more weights
-				calculate_nb_weights(nb_weights, nb_num, hops);
-				// for each frame in the overlay corresponding to this surface
-				for (t = 0; t<over[f]->nframes; t++) {
-					// for center vertex always weight 1.0
-					val = MRIgetVoxVal(over[f], v,  0, 0, t);
-					count = 1.0;
-					for (n = 0; n < nb_num; n++) {
-						val += (MRIgetVoxVal(over[f], neighbors[n],  0, 0, t)*nb_weights[n]);
-						count += nb_weights[n];
-					}
-					MRIsetVoxVal(output[f],v,0,0,t, val/count);
-				}
-			}
-		}
-	}
+		for (f = 0; f < ic_size; f++)
+		    output[f] = MRIclone(over[f], NULL);
+		    float val, count;
+		    // for each surface & each vertex
+		    for (f = 0; f < ic_size; f++) {
+			    for (v = 0; v < surf[f]->nvertices; v++) {
+				    // neighborhood
+				    nb_num = MRISfindNeighborsAtVertex(surf[f], v, nb_rad, MAX_NEIGHBORS, neighbors, hops);
+				    //TODO more weights
+				    calculate_nb_weights(nb_weights, nb_num, hops, tan_nb_wf);
+				    // for each frame in the overlay corresponding to this surface
+				    for (t = 0; t<over[f]->nframes; t++) {
+					    // for center vertex always weight 1.0
+					    val = MRIgetVoxVal(over[f], v,  0, 0, t);
+					    count = 1.0;
+					    for (n = 0; n < nb_num; n++) {
+						    val += (MRIgetVoxVal(over[f], neighbors[n],  0, 0, t)*nb_weights[n]);
+						    count += nb_weights[n];
+					    }
+					    MRIsetVoxVal(output[f],v,0,0,t, val/count);
+				    }
+			    }
+		    }
+	    }
 
 	// radial smoothing part ///////////////////////////////////////////////////////////////////////////////////////
 	// TODO in 2.0 add weights
+
+	// WB (3/30) TODO: find out how to generate ic_nb_weights
+
 	if (ic_size > 1) {
 		// initializing outputs with input overlays
-		if (nb_rad == 0) for (f = 0; f < ic_size; f++) output[f] = MRIcopy(over[f], NULL);
+		if (nb_rad == 0)
+		    for (f = 0; f < ic_size; f++)
+		        output[f] = MRIcopy(over[f], NULL);
 
 		float val;
 		// only for ic smoothing so all overlays have the same number of frames
-		for (t=0; t<over[0]->nframes; t++) {
-			for (v=0; v<over[0]->width; v++) {
+		for (t=0; t < over[0]->nframes; t++) {
+			for (v=0; v < over[0]->width; v++) {
 				val = 0.0;
-				for (f = 0; f < ic_size;f++)
-					val += MRIgetVoxVal(output[f], v,  0, 0, t);
+				ic_count = 1.0;
+				for (f = 0; f < ic_size; f++)
+					val += (MRIgetVoxVal(output[f], v,  0, 0, t)) * ic_nb_weights[v];
+				    ic_count += ic_nb_weights[v]
 				// write to output 0
-				MRIsetVoxVal(output[0],v,0,0,t, val/ic_size);
+				MRIsetVoxValoutput([0],v,0,0,t, val/ic_count);
 			}
 		}
 	}
@@ -225,23 +233,25 @@ int main(int argc, char *argv[]) {
 
 
 
-static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops) {
+static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops, int nb_wf) {
 	int n;
 	// gauss
 	if (nb_wf == 0) {
 		float sigma = nb_rad/2.3548;
-		for (n = 0; n < nb_num; n++) nb_weights[n] = (1/(sigma*sqrt(2*PI)))*exp(-(hops[n]*hops[n])/(2*sigma*sigma));
+		for (n = 0; n < nb_num; n++)
+		    nb_weights[n] = (1/(sigma*sqrt(2*PI)))*exp(-(hops[n]*hops[n])/(2*sigma*sigma));
 		//fmax(nb_weights);
 	// 1/NB
 	} else if (nb_wf == 1)	{
-			for (n = 0; n < nb_num; n++) {
-			if (hops[n] == 0) nb_weights[n] = 1.0; // for the center vertex
-			else nb_weights[n] = (float)(1.0/hops[n]);
+	    for (n = 0; n < nb_num; n++) {
+	        if (hops[n] == 0)
+	            nb_weights[n] = 1.0; // for the center vertex
+			else
+			    nb_weights[n] = (float)(1.0/hops[n]);
 		}
 	}
 	return;
 }
-
 
 
 
@@ -299,13 +309,20 @@ static int parse_commandline(int argc, char **argv) {
 			if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
 			ic_start = atoi(pargv[0]);
 			nargsused = 1;
-		// nb weights
+		// tan nb weights
 		} else if (!stricmp(option, "--tan-weights")) {
 			if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
-			if (!stricmp(pargv[0], "gauss")) nb_wf = 0;
-			else if (!stricmp(pargv[0], "distance")) nb_wf = 1;
+			if (!stricmp(pargv[0], "gauss")) tan_nb_wf = 0;
+			else if (!stricmp(pargv[0], "distance")) tan_nb_wf = 1;
 			else fprintf(stderr, "Unknown value %s for flag %s, a default gaussian weighting function will be applied instead.\n", pargv[0], option);
 			nargsused = 1;
+        // rad nb weights
+        } else if (!stricmp(option, "--rad-weights")) {
+            if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
+            if (!stricmp(pargv[0], "gauss")) rad_nb_wf = 0;
+            else if (!stricmp(pargv[0], "distance")) rad_nb_wf = 1;
+            else fprintf(stderr, "Unknown value %s for flag %s, a default gaussian weighting function will be applied instead.\n", pargv[0], option);
+            nargsused = 1;
 		} else if (!stricmp(option, "--help")) {
 			print_help();
 			exit(0);
@@ -332,17 +349,18 @@ static void check_options(void) {
 	if ((ic_size == 1) && (nb_rad == 0)) {
 		fprintf(stderr, "Neighborhood radius = %d & radial extent = %d => no smoothing will be performed.\n", nb_rad, ic_size);
 		exit(0);
+
 	// tangential smoothing: one overlay & one surface
 	} else if ((ic_size == 1) && (nb_rad > 0)) {
 		if (surf_num != 1) ErrorExit(ERROR_BADPARM, "Number of input surfaces = %d. Tangential smoothing requires 1 input surface.\n", surf_num);
 		if (over_num != 1) ErrorExit(ERROR_BADPARM, "Number of input overlays = %d. Tangential smoothing requires 1 input overlay.\n", over_num);
 		fprintf(stderr, "Neighborhood radius = %d & radial extent = %d => tangential smoothing will be performed for an input overlay.\n", nb_rad, ic_size);
+
 	// intracortical smoothing
 	} else if ((ic_size > 1) && (nb_rad >= 0)) {
 		if (surf_num != over_num) ErrorExit(ERROR_BADPARM, "Number of input surfaces = %d has to be the same as number of input overlays = %d for intracortical smoothing.\n", surf_num, over_num);
 		fprintf(stderr, "Neighborhood radius = %d & radial extent = %d from a starting surface = %d => intracortical smoothing will be performed.\n", nb_rad, ic_size, ic_start);
 	}
-
 
 	return;
 }
