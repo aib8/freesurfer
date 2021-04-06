@@ -54,6 +54,8 @@
 #include <ctype.h>
 #include <glob.h>
 #include <libgen.h>
+#include <fstream>
+#include <string>
 
 #include "macros.h"
 #include "error.h"
@@ -94,7 +96,8 @@ static void print_version(void);
 static char vcid[] = "$Id: mris_smooth_intracortical.c,v 1.30 2019/02/21 18:48:21 Anna Exp $";
 const char *Progname = NULL;
 
-char surf_path[STRLEN], over_path[STRLEN], out_path[STRLEN], surf_name[STRLEN], over_name[STRLEN], surf_dir[STRLEN], over_dir[STRLEN], out_dir[STRLEN], out_name[STRLEN];
+char surf_path[STRLEN], over_path[STRLEN], out_path[STRLEN], surf_name[STRLEN], over_name[STRLEN],
+surf_dir[STRLEN], over_dir[STRLEN], out_dir[STRLEN], out_name[STRLEN], ic_subset_weights_file[STRLEN];
 int surf_num = 0, over_num = 0, nb_rad = 0, ic_size = 1, ic_start = 0, tan_nb_wf = 0; rad_nb_wf = 0; //nb_wf = 0 (gauss)
 
 int main(int argc, char *argv[]) {
@@ -189,27 +192,44 @@ int main(int argc, char *argv[]) {
 	    }
 
 	// radial smoothing part ///////////////////////////////////////////////////////////////////////////////////////
-	// TODO in 2.0 add weights
-
-	// WB (3/30) TODO: find out how to generate ic_nb_weights
-
 	if (ic_size > 1) {
-		// initializing outputs with input overlays
+	    // define neighborhood number based on ic_size
+	    static int ic_nb_weights[ic_size];
+	    int hops[ic_size];
+
+        // generate list of hops for radial subset
+        int count = ic_size / 2;
+        int increment = -1
+        for (int i = 0; i < ic_size; i++) {
+            if (count == 0) {
+                hops[i] = 0;
+                increment = 1;
+                count += increment;
+            } else {
+                hops[i] = count;
+                count += increment;
+            }
+        }
+
+        // initializing outputs with input overlays
 		if (nb_rad == 0)
 		    for (f = 0; f < ic_size; f++)
 		        output[f] = MRIcopy(over[f], NULL);
 
-		float val;
 		// only for ic smoothing so all overlays have the same number of frames
-		for (t=0; t < over[0]->nframes; t++) {
+		for (t = 0; t < over[0]->nframes; t++) {
 			for (v=0; v < over[0]->width; v++) {
-				val = 0.0;
+				float val = 0.0;
 				ic_count = 1.0;
-				for (f = 0; f < ic_size; f++)
-					val += (MRIgetVoxVal(output[f], v,  0, 0, t)) * ic_nb_weights[v];
-				    ic_count += ic_nb_weights[v]
+
+                calculate_nb_weights(ic_nb_weights, ic_size, hops, rad_nb_wf)
+				for (f = 0; f < ic_size; f++) {
+                    val += (MRIgetVoxVal(over[f], v,  0, 0, t)) * ic_nb_weights[f];
+                    ic_count += ic_nb_weights[v]
+				}
+
 				// write to output 0
-				MRIsetVoxValoutput([0],v,0,0,t, val/ic_count);
+				MRIsetVoxValoutput(output[0],v,0,0,t, val/ic_count);
 			}
 		}
 	}
@@ -230,30 +250,51 @@ int main(int argc, char *argv[]) {
 	return (NO_ERROR);
 }
 
-
-
-
 static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops, int nb_wf) {
-	int n;
-	// gauss
-	if (nb_wf == 0) {
-		float sigma = nb_rad/2.3548;
-		for (n = 0; n < nb_num; n++)
-		    nb_weights[n] = (1/(sigma*sqrt(2*PI)))*exp(-(hops[n]*hops[n])/(2*sigma*sigma));
-		//fmax(nb_weights);
-	// 1/NB
-	} else if (nb_wf == 1)	{
-	    for (n = 0; n < nb_num; n++) {
-	        if (hops[n] == 0)
-	            nb_weights[n] = 1.0; // for the center vertex
-			else
-			    nb_weights[n] = (float)(1.0/hops[n]);
-		}
-	}
-	return;
+    int n;
+    // gauss
+    if (nb_wf == 0) {
+        float sigma = nb_rad / 2.3548;
+        for (n = 0; n < nb_num; n++)
+            nb_weights[n] = (1 / (sigma * sqrt(2 * PI))) * exp(-(hops[n] * hops[n]) / (2 * sigma * sigma));
+        //fmax(nb_weights);
+        // 1/NB
+    // distance
+    } else if (nb_wf == 1) {
+        for (n = 0; n < nb_num; n++) {
+            if (hops[n] == 0)
+                nb_weights[n] = 1.0; // for the center vertex
+            else
+                nb_weights[n] = (float) (1.0 / hops[n]);
+        }
+    // custom
+    } else if (nb_wf == 2) {
+        // grab the user-specified weights from text file
+        string current_weight;
+        float custom_weights[MAX_SURF]
+        ifstream weights_file(ic_subset_weights_file);
+        if (!weights_file.isopen()) {
+            ErrorExit(ERROR_BADPARM, "Custom weights file name not valid. \n");
+        }
+
+        // check whether number of text file weights is correct size
+        int count = 0;
+        while (getline(weights_file, current_weight)) {
+            custom_weights[count] = current_weight;
+            count++;
+        }
+
+        if (!(sizeof(custom_weights) == ic_size)) {
+            ErrorExit(ERROR_BADPARM, "Number of custom weights must match specified ic size. \n");
+        }
+
+        // fill nb_weights with these weights
+        for (int i = 0; i < ic_size; i++) {
+            nb_weights[i] = custom_weights[i];
+        }
+    }
+    return;
 }
-
-
 
 /*!
 \fn int parse_commandline(int argc, char **argv)
@@ -321,7 +362,13 @@ static int parse_commandline(int argc, char **argv) {
             if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
             if (!stricmp(pargv[0], "gauss")) rad_nb_wf = 0;
             else if (!stricmp(pargv[0], "distance")) rad_nb_wf = 1;
+            else if (!stricmp(pargv[0], "custom")) rad_nb_wf = 2;
             else fprintf(stderr, "Unknown value %s for flag %s, a default gaussian weighting function will be applied instead.\n", pargv[0], option);
+            nargsused = 1;
+        // if the user provides a .txt file with sic smoothing weights
+		} else if (!stricmp(option, "--custom-weights-file-name")) {
+            if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
+            strcpy(ic_subset_weights_file, pargv[0]);
             nargsused = 1;
 		} else if (!stricmp(option, "--help")) {
 			print_help();
