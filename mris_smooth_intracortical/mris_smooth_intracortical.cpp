@@ -83,7 +83,7 @@
 #endif
 
 int main(int argc, char *argv[]);
-static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops);
+static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops, int nb_wf);
 
 static int parse_commandline(int argc, char **argv);
 static void print_help(void);
@@ -98,7 +98,7 @@ const char *Progname = NULL;
 
 char surf_path[STRLEN], over_path[STRLEN], out_path[STRLEN], surf_name[STRLEN], over_name[STRLEN],
 surf_dir[STRLEN], over_dir[STRLEN], out_dir[STRLEN], out_name[STRLEN], ic_subset_weights_file[STRLEN];
-int surf_num = 0, over_num = 0, nb_rad = 0, ic_size = 1, ic_start = 0, tan_nb_wf = 0; rad_nb_wf = 0; //nb_wf = 0 (gauss)
+int surf_num = 0, over_num = 0, nb_rad = 0, ic_size = 1, ic_start = 0, tan_nb_wf = 0, rad_nb_wf = 0; //nb_wf = 0 (gauss)
 
 int main(int argc, char *argv[]) {
 	Progname = argv[0];
@@ -194,12 +194,12 @@ int main(int argc, char *argv[]) {
 	// radial smoothing part ///////////////////////////////////////////////////////////////////////////////////////
 	if (ic_size > 1) {
 	    // define neighborhood number based on ic_size
-	    static int ic_nb_weights[ic_size];
+	    float ic_nb_weights[ic_size];
 	    int hops[ic_size];
 
         // generate list of hops for radial subset
         int count = ic_size / 2;
-        int increment = -1
+        int increment = -1;
         for (int i = 0; i < ic_size; i++) {
             if (count == 0) {
                 hops[i] = 0;
@@ -220,16 +220,16 @@ int main(int argc, char *argv[]) {
 		for (t = 0; t < over[0]->nframes; t++) {
 			for (v=0; v < over[0]->width; v++) {
 				float val = 0.0;
-				ic_count = 1.0;
+				int ic_count = 1.0;
 
-                calculate_nb_weights(ic_nb_weights, ic_size, hops, rad_nb_wf)
+                calculate_nb_weights(ic_nb_weights, ic_size, hops, rad_nb_wf);
 				for (f = 0; f < ic_size; f++) {
                     val += (MRIgetVoxVal(over[f], v,  0, 0, t)) * ic_nb_weights[f];
-                    ic_count += ic_nb_weights[v]
+                    ic_count += ic_nb_weights[v];
 				}
 
 				// write to output 0
-				MRIsetVoxValoutput(output[0],v,0,0,t, val/ic_count);
+				MRIsetVoxVal(output[0],v,0,0,t, val/ic_count);
 			}
 		}
 	}
@@ -270,17 +270,17 @@ static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops, int n
     // custom
     } else if (nb_wf == 2) {
         // grab the user-specified weights from text file
-        string current_weight;
-        float custom_weights[MAX_SURF]
-        ifstream weights_file(ic_subset_weights_file);
-        if (!weights_file.isopen()) {
+        std::string current_weight;
+        float custom_weights[MAX_SURF];
+        std::ifstream weights_file(ic_subset_weights_file);
+        if (!weights_file.is_open()) {
             ErrorExit(ERROR_BADPARM, "Custom weights file name not valid. \n");
         }
 
         // check whether number of text file weights is correct size
         int count = 0;
         while (getline(weights_file, current_weight)) {
-            custom_weights[count] = current_weight;
+            custom_weights[count] = stod(current_weight);
             count++;
         }
 
@@ -365,7 +365,7 @@ static int parse_commandline(int argc, char **argv) {
             else if (!stricmp(pargv[0], "custom")) rad_nb_wf = 2;
             else fprintf(stderr, "Unknown value %s for flag %s, a default gaussian weighting function will be applied instead.\n", pargv[0], option);
             nargsused = 1;
-        // if the user provides a .txt file with sic smoothing weights
+        // if the user provides a .txt file with ic smoothing weights
 		} else if (!stricmp(option, "--custom-weights-file-name")) {
             if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
             strcpy(ic_subset_weights_file, pargv[0]);
@@ -440,7 +440,11 @@ static void print_usage(void) {
   				"  --tan-weights type      : weighting function for tangential smoothing [default: gauss]\n"
   				"                            gauss = gaussian with FWHM = tansize\n"
   				"                            distance = 1/tansize\n"
-  				"  --rad-weights type      : weighting function for radial extent of the kernel: not yet implemented\n"
+  				"  --rad-weights type      : weighting function for radial extent of the kernel: [default: gauss]\n"
+ 				"                            gauss = gaussian with FWHM = tansize\n"
+				"			     distane = 1/tansize\n"
+				"			     custom = text file specified by user\n"
+				"  --custom-weights-file      : path to the text file containing the user specified, custom weights (include note on format, once decided)\n"
   				"\n"
   				"  --help                  : prints this info\n"
 					"\n"
