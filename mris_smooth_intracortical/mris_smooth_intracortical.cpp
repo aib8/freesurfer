@@ -123,6 +123,8 @@ int main(int argc, char *argv[]) {
 	MRI *over[ic_size], *output[ic_size];
 
 	// read only surfaces/overlays that are included in the radial extent of the kernel
+	printf("ic_start = %d\n", ic_start);
+	printf("ic_size = %d\n", ic_size);
 	for (f = ic_start; f < ic_size+ic_start; f++) {
 		// read overlays
 		printf("Reading: %s\n", over_list.gl_pathv[f]);
@@ -141,8 +143,11 @@ int main(int argc, char *argv[]) {
 				ErrorExit(ERROR_BADPARM, "Number of vertices in surface %s = %d is different than number of vertices in surface %s = %d.\n", surf_list.gl_pathv[f], surf[f-ic_start]->nvertices, surf_list.gl_pathv[0], surf[0]->nvertices);
 			if (over[f-ic_start]->width != surf[f-ic_start]->nvertices)
 				ErrorExit(ERROR_BADPARM, "Number of data points in overlay %s = %d is different than number of vertices in surface %s = %d.\n", over_list.gl_pathv[f], over[f-ic_start]->width, surf_list.gl_pathv[f], surf[f-ic_start]->nvertices);
+			printf("Finished with overlay iteration #%d\n", f);
 		}
+		printf("Finished with surface iteration #%d, max iteration: %d\n", f, ic_size+ic_start);
 	}
+	printf("Read in all surfaces!\n");
 
 
 	// if no output dir/name given - set based on 1st overlay
@@ -159,6 +164,7 @@ int main(int argc, char *argv[]) {
 
 	// tangential smoothing part ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	printf("Lets tangentially smooth!\n");
 	if (nb_rad > 0) {
 		static int neighbors[MAX_NEIGHBORS];
 		static int hops[MAX_NEIGHBORS];
@@ -192,6 +198,7 @@ int main(int argc, char *argv[]) {
 	    }
 
 	// radial smoothing part ///////////////////////////////////////////////////////////////////////////////////////
+	printf("Lets intracortically smooth\n");
 	if (ic_size > 1) {
 	    // define neighborhood number based on ic_size
 	    float ic_nb_weights[ic_size];
