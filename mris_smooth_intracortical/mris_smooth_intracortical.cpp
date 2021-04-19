@@ -123,8 +123,6 @@ int main(int argc, char *argv[]) {
 	MRI *over[ic_size], *output[ic_size];
 
 	// read only surfaces/overlays that are included in the radial extent of the kernel
-	printf("ic_start = %d\n", ic_start);
-	printf("ic_size = %d\n", ic_size);
 	for (f = ic_start; f < ic_size+ic_start; f++) {
 		// read overlays
 		printf("Reading: %s\n", over_list.gl_pathv[f]);
@@ -143,11 +141,11 @@ int main(int argc, char *argv[]) {
 				ErrorExit(ERROR_BADPARM, "Number of vertices in surface %s = %d is different than number of vertices in surface %s = %d.\n", surf_list.gl_pathv[f], surf[f-ic_start]->nvertices, surf_list.gl_pathv[0], surf[0]->nvertices);
 			if (over[f-ic_start]->width != surf[f-ic_start]->nvertices)
 				ErrorExit(ERROR_BADPARM, "Number of data points in overlay %s = %d is different than number of vertices in surface %s = %d.\n", over_list.gl_pathv[f], over[f-ic_start]->width, surf_list.gl_pathv[f], surf[f-ic_start]->nvertices);
-			printf("Finished with overlay iteration #%d\n", f);
+
 		}
-		printf("Finished with surface iteration #%d, max iteration: %d\n", f, ic_size+ic_start);
+		
 	}
-	printf("Read in all surfaces!\n");
+	printf("Read in all surfaces/overlays \n");
 
 
 	// if no output dir/name given - set based on 1st overlay
@@ -164,7 +162,7 @@ int main(int argc, char *argv[]) {
 
 	// tangential smoothing part ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	printf("Lets tangentially smooth!\n");
+	printf("Tangentially smoothing ... \n");
 	if (nb_rad > 0) {
 		static int neighbors[MAX_NEIGHBORS];
 		static int hops[MAX_NEIGHBORS];
@@ -198,10 +196,11 @@ int main(int argc, char *argv[]) {
 	    }
 
 	// radial smoothing part ///////////////////////////////////////////////////////////////////////////////////////
-	printf("Lets intracortically smooth\n");
+	printf("Intracortically smoothing ...\n");	
+	printf("Check-point 1\n");
 	if (ic_size > 1) {
 	    // define neighborhood number based on ic_size
-	    float ic_nb_weights[ic_size];
+	    float ic_nb_weights[MAX_SURF];
 	    int hops[ic_size];
 
         // generate list of hops for radial subset
@@ -219,20 +218,30 @@ int main(int argc, char *argv[]) {
         }
 
         // initializing outputs with input overlays
+		printf("Check-point 2\n");
+		printf("nb_rad = %d\n", nb_rad);
 		if (nb_rad == 0)
 		    for (f = 0; f < ic_size; f++)
 		        output[f] = MRIcopy(over[f], NULL);
 
-		// only for ic smoothing so all overlays have the same number of frames
-		for (t = 0; t < over[0]->nframes; t++) {
-			for (v=0; v < over[0]->width; v++) {
-				float val = 0.0;
-				int ic_count = 1.0;
+		float val;
 
-                calculate_nb_weights(ic_nb_weights, ic_size, hops, rad_nb_wf);
+		// only for ic smoothing so all overlays have the same number of frames
+		printf("Check-point 3\n");
+		printf("Nframes: %d\n", over[0]->nframes);
+		for (t=0; t < over[0]->nframes; t++) {
+			//printf("Width (# verticies): %d\n", over[0]->width);
+			for (v=0; v < over[0]->width; v++) {
+				val = 0.0;
+				int ic_count = 0;
+
+				//printf("Vertex #%d\n", v);
+               			calculate_nb_weights(ic_nb_weights, ic_size, hops, rad_nb_wf);
+				//static float temp_weights[3] = {1, 1, 1};
 				for (f = 0; f < ic_size; f++) {
-                    val += (MRIgetVoxVal(over[f], v,  0, 0, t)) * ic_nb_weights[f];
-                    ic_count += ic_nb_weights[v];
+					//printf("\tOverlay subset #%d\n", f);
+                    			val += (MRIgetVoxVal(output[f], v,  0, 0, t)) * ic_nb_weights[f];
+                    			ic_count += ic_nb_weights[f];
 				}
 
 				// write to output 0
@@ -241,6 +250,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	printf("Check-point 4\n");
 	// write an output overlay ///////////////////////////////////////////////////////////////////////////////////////
 	sprintf(out_path, "%s%s%s", out_dir, SEP, out_name);
 	printf("Saving result: %s\n", out_path);
@@ -287,12 +297,16 @@ static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops, int n
         // check whether number of text file weights is correct size
         int count = 0;
         while (getline(weights_file, current_weight)) {
-            custom_weights[count] = stod(current_weight);
+            custom_weights[count] = stof(current_weight);
             count++;
         }
 
-        if (!(sizeof(custom_weights) == ic_size)) {
-            ErrorExit(ERROR_BADPARM, "Number of custom weights must match specified ic size. \n");
+	printf("Number of custum weights: %d\n", count);
+
+        if (!(count == ic_size)) {
+            //ErrorExit(ERROR_BADPARM, "Number of custom weights must match specified ic size. \n");
+	    printf("Number of custom weights (%d) must match specified ic size (%d). \n", (int) sizeof(custom_weights), ic_size);
+	    exit(0);
         }
 
         // fill nb_weights with these weights
