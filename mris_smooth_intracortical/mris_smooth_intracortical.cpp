@@ -99,6 +99,7 @@ const char *Progname = NULL;
 char surf_path[STRLEN], over_path[STRLEN], out_path[STRLEN], surf_name[STRLEN], over_name[STRLEN],
 surf_dir[STRLEN], over_dir[STRLEN], out_dir[STRLEN], out_name[STRLEN], ic_subset_weights_file[STRLEN];
 int surf_num = 0, over_num = 0, nb_rad = 0, ic_size = 1, ic_start = 0, tan_nb_wf = 0, rad_nb_wf = 0; //nb_wf = 0 (gauss)
+float custom_weights[MAX_SURF];
 
 int main(int argc, char *argv[]) {
 	Progname = argv[0];
@@ -286,29 +287,6 @@ static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops, int n
         }
     // custom
     } else if (nb_wf == 2) {
-        // grab the user-specified weights from text file
-        std::string current_weight;
-        float custom_weights[MAX_SURF];
-        std::ifstream weights_file(ic_subset_weights_file);
-        if (!weights_file.is_open()) {
-            ErrorExit(ERROR_BADPARM, "Custom weights file name not valid. \n");
-        }
-
-        // check whether number of text file weights is correct size
-        int count = 0;
-        while (getline(weights_file, current_weight)) {
-            custom_weights[count] = stof(current_weight);
-            count++;
-        }
-
-	printf("Number of custum weights: %d\n", count);
-
-        if (!(count == ic_size)) {
-            //ErrorExit(ERROR_BADPARM, "Number of custom weights must match specified ic size. \n");
-	    printf("Number of custom weights (%d) must match specified ic size (%d). \n", (int) sizeof(custom_weights), ic_size);
-	    exit(0);
-        }
-
         // fill nb_weights with these weights
         for (int i = 0; i < ic_size; i++) {
             nb_weights[i] = custom_weights[i];
@@ -390,6 +368,7 @@ static int parse_commandline(int argc, char **argv) {
 		} else if (!stricmp(option, "--custom-weights-file-name")) {
             if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
             strcpy(ic_subset_weights_file, pargv[0]);
+            retrieve_custom_weights();
             nargsused = 1;
 		} else if (!stricmp(option, "--help")) {
 			print_help();
@@ -400,6 +379,35 @@ static int parse_commandline(int argc, char **argv) {
 	}
 	return (0);
 }
+
+/*!
+\fn static void retrieve_custom_weights(void)
+\brief Fills up global custom_weights array with numbers in the provided .txt file
+*/
+static void retrieve_custom_weights(void) {
+    // grab the user-specified weights from text file
+    std::string current_weight;
+    std::ifstream weights_file(ic_subset_weights_file);
+    if (!weights_file.is_open()) {
+        ErrorExit(ERROR_BADPARM, "Custom weights file name not valid. \n");
+    }
+
+    // check whether number of text file weights is correct size
+    int count = 0;
+    while (getline(weights_file, current_weight)) {
+        custom_weights[count] = stof(current_weight);
+        count++;
+    }
+
+    printf("Number of custum weights: %d\n", count);
+
+    if (!(count == ic_size)) {
+        //ErrorExit(ERROR_BADPARM, "Number of custom weights must match specified ic size. \n");
+        printf("Number of custom weights (%d) must match specified ic size (%d). \n", (int) sizeof(custom_weights), ic_size);
+        exit(0);
+    }
+}
+
 
 /*!
 \fn static void check_options(void)
