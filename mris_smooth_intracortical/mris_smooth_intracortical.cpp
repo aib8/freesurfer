@@ -86,6 +86,7 @@ int main(int argc, char *argv[]);
 static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops, int nb_wf);
 
 static int parse_commandline(int argc, char **argv);
+static void retrieve_custom_weights(void);
 static void print_help(void);
 static void check_options(void);
 static void print_usage(void);
@@ -198,7 +199,6 @@ int main(int argc, char *argv[]) {
 
 	// radial smoothing part ///////////////////////////////////////////////////////////////////////////////////////
 	printf("Intracortically smoothing ...\n");	
-	printf("Check-point 1\n");
 	if (ic_size > 1) {
 	    // define neighborhood number based on ic_size
 	    float ic_nb_weights[MAX_SURF];
@@ -219,8 +219,6 @@ int main(int argc, char *argv[]) {
         }
 
         // initializing outputs with input overlays
-		printf("Check-point 2\n");
-		printf("nb_rad = %d\n", nb_rad);
 		if (nb_rad == 0)
 		    for (f = 0; f < ic_size; f++)
 		        output[f] = MRIcopy(over[f], NULL);
@@ -228,8 +226,6 @@ int main(int argc, char *argv[]) {
 		float val;
 
 		// only for ic smoothing so all overlays have the same number of frames
-		printf("Check-point 3\n");
-		printf("Nframes: %d\n", over[0]->nframes);
 		for (t=0; t < over[0]->nframes; t++) {
 			//printf("Width (# verticies): %d\n", over[0]->width);
 			for (v=0; v < over[0]->width; v++) {
@@ -251,7 +247,6 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	printf("Check-point 4\n");
 	// write an output overlay ///////////////////////////////////////////////////////////////////////////////////////
 	sprintf(out_path, "%s%s%s", out_dir, SEP, out_name);
 	printf("Saving result: %s\n", out_path);
