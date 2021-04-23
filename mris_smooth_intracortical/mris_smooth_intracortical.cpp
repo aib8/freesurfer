@@ -230,7 +230,7 @@ int main(int argc, char *argv[]) {
 			//printf("Width (# verticies): %d\n", over[0]->width);
 			for (v=0; v < over[0]->width; v++) {
 				val = 0.0;
-				int ic_count = 0;
+				float ic_count = 0;
 
 				//printf("Vertex #%d\n", v);
                			calculate_nb_weights(ic_nb_weights, ic_size, hops, rad_nb_wf);
@@ -351,20 +351,31 @@ static int parse_commandline(int argc, char **argv) {
 			else if (!stricmp(pargv[0], "distance")) tan_nb_wf = 1;
 			else fprintf(stderr, "Unknown value %s for flag %s, a default gaussian weighting function will be applied instead.\n", pargv[0], option);
 			nargsused = 1;
-        // rad nb weights
-        } else if (!stricmp(option, "--rad-weights")) {
-            if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
-            if (!stricmp(pargv[0], "gauss")) rad_nb_wf = 0;
-            else if (!stricmp(pargv[0], "distance")) rad_nb_wf = 1;
-            else if (!stricmp(pargv[0], "custom")) rad_nb_wf = 2;
-            else fprintf(stderr, "Unknown value %s for flag %s, a default gaussian weighting function will be applied instead.\n", pargv[0], option);
-            nargsused = 1;
-        // if the user provides a .txt file with ic smoothing weights
+       		 // rad nb weights
+        	} else if (!stricmp(option, "--rad-weights")) {
+	                if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
+            	        if (!stricmp(pargv[0], "gauss")) rad_nb_wf = 0;
+            		else if (!stricmp(pargv[0], "distance")) rad_nb_wf = 1;
+            		else if (!stricmp(pargv[0], "custom")) rad_nb_wf = 2;
+            		else fprintf(stderr, "Unknown value %s for flag %s, a default gaussian weighting function will be applied instead.\n", pargv[0], option);
+            		nargsused = 1;
+        	// if the user wants to provide the custom smoothing weights via the command line
+		} else if (!stricmp(option, "--custom-weights-command-line")) {
+			if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
+			if (!(nargc == ic_size)) {
+				printf("Number of custom weights (%d) must match specified ic size (%d). \n", nargc, ic_size);
+			}
+			for (int i = 0; i < ic_size; i++) {
+				printf("Current custom weight: %f\n", std::stof(pargv[i]));
+				custom_weights[i] = std::stof(pargv[i]);
+			}
+			nargsused = ic_size;
+		// if the user provides a .txt file with ic smoothing weights 
 		} else if (!stricmp(option, "--custom-weights-file-name")) {
-            if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
-            strcpy(ic_subset_weights_file, pargv[0]);
-            retrieve_custom_weights();
-            nargsused = 1;
+            		if (nargc < 1) ErrorExit(ERROR_BADPARM, "Flag %s needs an argument\n", option);
+            		strcpy(ic_subset_weights_file, pargv[0]);
+            		retrieve_custom_weights();
+            		nargsused = 1;
 		} else if (!stricmp(option, "--help")) {
 			print_help();
 			exit(0);
