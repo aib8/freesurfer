@@ -494,7 +494,7 @@ static void print_usage(void) {
 				"			     distane = 1/tansize\n"
 				"			     custom = text file specified by user\n"
 				"  --custom-weights-file path      : path to the text file containing the user specified, custom weights for intracortical smoothing (numbers must be separated by a new line)\n"
-                "  --custom-weights-command-line num1 num2 num3 ...      : list of custom weights for intracortical smoothing (number of inputs must equal the radsize\n"
+                "  --custom-weights-command-line num1 num2 num3 ...      : list of custom weights for intracortical smoothing (number of inputs must equal the radsize)\n"
   				"\n"
   				"  --help                  : prints this info\n"
 					"\n"
