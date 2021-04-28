@@ -16,6 +16,12 @@
  *    $Date:  $
  *    $Revision:  $
  *
+ * Student Revision Info:
+ *    $Author: William Bonaventura
+ *    $Date: 2/21 - 5/21
+ *    $Revision: Adding functionality for ic smoothing and user provided
+ *               custom weights (via text file or command line)
+ *
  * Copyright © 2011 The General Hospital Corporation (Boston, MA) "MGH"
  *
  * Terms and conditions for use, reproduction, distribution and contribution
@@ -149,7 +155,6 @@ int main(int argc, char *argv[]) {
 	}
 	printf("Read in all surfaces/overlays \n");
 
-
 	// if no output dir/name given - set based on 1st overlay
 	if (strlen(out_dir) == 0) strcpy(out_dir, over_dir);
 	if (strlen(out_name) == 0) {
@@ -263,6 +268,14 @@ int main(int argc, char *argv[]) {
 	return (NO_ERROR);
 }
 
+/*!
+\fn void calculate_nb_weights(float *nb_weights, int nb_num, int *hops, int nb_wf)
+\brief Determines the appropriate weights for this neighborhood, fills nb_weight array
+\param nb_weights - the array containing the different weights
+\param nb_num - the size of the current neighbor (number of weights to determine)
+\param hops - the list of hops corresponding to each neighbor
+\param nb_wf - the neighborhood weight function at hand
+*/
 static void calculate_nb_weights(float *nb_weights, int nb_num, int *hops, int nb_wf) {
     int n;
     // gauss
@@ -452,7 +465,8 @@ static void check_options(void) {
 \brief Prints usage and exits
 */
 static void print_usage(void) {
-  printf("USAGE: %s --surf_dir surfdir --surf_name surfname --overlay_dir overdir --overlay_name overname [--output_dir outdir --output_name outname --tan-size tansize --rad-size radsize --rad-start radstart]\n",Progname);
+  printf("USAGE: %s --surf_dir surfdir --surf_name surfname --overlay_dir overdir --overlay_name overname [--output_dir outdir --output_name outname --tan-size tansize"
+         " --rad-size radsize --rad-start radstart --tan-weights type --rad-weights type custom-weights-file path]\n",Progname);
   printf("\n"
 					"  --surf_dir surfdir      : path to the directory with surface meshes (use mris_extend for creating intermediate surfaces between white and pial)\n"
 					"  --surf_name surfname    : name of a surface file(s) (use * and ? to pass multiple names, maximum %d)\n"
@@ -479,7 +493,8 @@ static void print_usage(void) {
  				"                            gauss = gaussian with FWHM = tansize\n"
 				"			     distane = 1/tansize\n"
 				"			     custom = text file specified by user\n"
-				"  --custom-weights-file      : path to the text file containing the user specified, custom weights (include note on format, once decided)\n"
+				"  --custom-weights-file path      : path to the text file containing the user specified, custom weights for intracortical smoothing (numbers must be separated by a new line)\n"
+                "  --custom-weights-command-line num1 num2 num3 ...      : list of custom weights for intracortical smoothing (number of inputs must equal the radsize\n"
   				"\n"
   				"  --help                  : prints this info\n"
 					"\n"
